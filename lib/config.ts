@@ -39,6 +39,7 @@ export interface Config {
   onlyDefaultGraph?: boolean;
   fetch?: typeof fetch;
   basicAuth?: string;
+  concurrent?: number;
   // Add flag to indicate in order (default true)
   // Make sure that slower pages to first emit the first members
   //
@@ -80,7 +81,7 @@ export function intoConfig(config: Partial<Config>): Config {
 
     config.fetch = limit_fetch_per_domain(
       retry_fetch(fetch_f, [408, 425, 429, 500, 502, 503, 504, 404]),
-      1,
+      config.concurrent || 5,
     );
   }
 

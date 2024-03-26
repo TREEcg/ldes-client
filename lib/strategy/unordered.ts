@@ -4,6 +4,10 @@ import { Modulator, ModulatorFactory, Notifier } from "../utils";
 
 import { StrategyEvents } from ".";
 
+import debug from "debug";
+
+const log = debug("strategy");
+
 export class UnorderedStrategy {
   private manager: Manager;
   private fetcher: Fetcher;
@@ -36,6 +40,7 @@ export class UnorderedStrategy {
     this.fetcher = fetcher;
     this.polling = polling;
 
+    const fetchLogger = log.extend("fetch");
     // Callbacks for the fetcher
     // - seen: the strategy wanted to fetch an uri, but it was already seen
     //         so one fetch request is terminated, inFlight -= 1
@@ -44,13 +49,17 @@ export class UnorderedStrategy {
     // - relationFound: a relation has been found, inFlight += 1 and put it in the queue
     this.fetchNotifier = {
       error: (error: any) => {
+        fetchLogger("error %o", error);
         this.notifier.error(error, {});
       },
       scheduleFetch: (node: Node) => {
         this.cacheList.push(node);
         this.notifier.mutable({}, {});
       },
-      pageFetched: (page, { index }) => this.handleFetched(page, index),
+      pageFetched: (page, { index }) => {
+        fetchLogger("Paged fetched %s", page.url);
+        this.handleFetched(page, index);
+      },
       relationFound: ({ from, target }) => {
         from.expected.push(target.node);
         this.inFlight += 1;
@@ -77,13 +86,14 @@ export class UnorderedStrategy {
   }
 
   start(url: string) {
+    const logger = log.extend("start");
     this.inFlight = this.modulator.length();
     if (this.inFlight < 1) {
       this.inFlight = 1;
       this.modulator.push({ target: url, expected: [] });
-      console.log("Nothing in flight, adding start url");
+      logger("Nothing in flight, adding start url");
     } else {
-      console.log("Things are already inflight, not adding start url");
+      logger("Things are already inflight, not adding start url");
     }
   }
 
@@ -112,7 +122,7 @@ export class UnorderedStrategy {
           }
         }, this.pollInterval || 1000);
       } else {
-        console.log("Closing notifier");
+        log("Closing the notifier, polling is not set");
         this.cancled = true;
         this.notifier.close({}, {});
       }
