@@ -21,9 +21,16 @@ export type ExtractedMember = {
   member: Member;
 };
 
+export type ExtractError = {
+  type: "extract";
+  memberId: Term;
+  error: any;
+};
+export type Error = ExtractError;
 export type MemberEvents = {
   extracted: Member;
   done: Member[];
+  error: Error;
 };
 
 export class Manager {
@@ -70,6 +77,7 @@ export class Manager {
     member: Term,
     data: RdfStore,
   ): Promise<Quad[]> {
+    const logger = log.extend("extract");
     if (this.shapeMap) {
       if (this.shapeMap.size === 1) {
         // Use the only shape available
@@ -87,6 +95,15 @@ export class Manager {
             return await this.extractor.extract(data, member, shapeId);
           }
         }
+
+        logger(
+          "%s (%s) is not part of the configured types %s",
+          member.value,
+          types.map((x) => x.value).join(", "),
+          [...this.shapeMap.keys()].join(", "),
+        );
+
+        return [];
       }
     }
 
@@ -132,7 +149,6 @@ export class Manager {
         )?.object.value;
       }
 
-      // HEAD
       return { id: member, quads, timestamp, isVersionOf };
     }
   }
@@ -148,16 +164,23 @@ export class Manager {
 
     logger("%d members", members.length);
 
-    const promises: Promise<Member | undefined>[] = [];
+    const promises: Promise<Member | undefined | void>[] = [];
 
     for (let member of members) {
       if (!this.state.has(member.value)) {
-        const promise = this.extractMember(member, page.data).then((member) => {
-          if (member) {
-            notifier.extracted(member, state);
-          }
-          return member;
-        });
+        const promise = this.extractMember(member, page.data)
+          .then((member) => {
+            if (member) {
+              notifier.extracted(member, state);
+            }
+            return member;
+          })
+          .catch((ex) => {
+            notifier.error(
+              { error: ex, type: "extract", memberId: member },
+              state,
+            );
+          });
 
         promises.push(promise);
       }

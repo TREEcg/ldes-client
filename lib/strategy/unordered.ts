@@ -67,11 +67,16 @@ export class UnorderedStrategy {
       },
     };
 
+    const memberLogger = log.extend("member");
     // Callbacks for the member extractor
     // - done: all members have been extracted, we are finally done with a page inFlight -= 1
     // - extracted: a member has been found, yeet it
     this.memberNotifier = {
+      error: error => {
+        this.notifier.error(error, {});
+      },
       done: () => {
+        memberLogger("Members on page done");
         this.inFlight -= 1;
         this.checkEnd();
         this.notifier.fragment({}, {});
