@@ -222,7 +222,7 @@ export class OrderedStrategy {
     }
   }
 
-  cancle() {
+  cancel() {
     this.cancled = true;
   }
 

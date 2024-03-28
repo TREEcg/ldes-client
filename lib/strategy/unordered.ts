@@ -102,7 +102,7 @@ export class UnorderedStrategy {
     }
   }
 
-  cancle() {
+  cancel() {
     this.cancled = true;
   }
 

@@ -127,11 +127,14 @@ async function main() {
     undefined,
     undefined,
     ordered,
-    // intoConfig({ url: "http://marineregions.org/feed" }),
   );
 
   if (verbose) {
     client.on("fragment", () => console.error("Fragment!"));
+  }
+
+  if (!quiet) {
+    client.on("error", (error) => console.error("Error", error));
   }
 
   const reader = client.stream({ highWaterMark: 10 }).getReader();
