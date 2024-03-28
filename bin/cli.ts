@@ -20,6 +20,7 @@ let verbose: boolean = false;
 let save: string | undefined;
 let onlyDefaultGraph: boolean = false;
 let loose: boolean = false;
+let concurrent: number = 5;
 let basicAuth: string | undefined;
 
 program
@@ -63,6 +64,11 @@ program
   .option("-q --quiet", "be quiet")
   .option("-v --verbose", "be verbose")
   .option("--basic-auth <username>:<password>", "HTTP basic auth information")
+  .option(
+    "--concurrent <requests>",
+    "Allowed amount of concurrent HTTP request to the same domain",
+    "5",
+  )
   .action((url: string, program) => {
     urlIsView = program.urlIsView;
     noShape = !program.shape;
@@ -77,6 +83,8 @@ program
     loose = program.loose;
     onlyDefaultGraph = program.onlyDefaultGraph;
     basicAuth = program.basicAuth;
+    concurrent = parseInt(program.concurrent);
+
     if (program.after) {
       if (!isNaN(new Date(program.after).getTime())) {
         after = new Date(program.after);
@@ -114,15 +122,19 @@ async function main() {
       after,
       before,
       basicAuth,
+      concurrent,
     }),
     undefined,
     undefined,
     ordered,
-    // intoConfig({ url: "http://marineregions.org/feed" }),
   );
 
   if (verbose) {
     client.on("fragment", () => console.error("Fragment!"));
+  }
+
+  if (!quiet) {
+    client.on("error", (error) => console.error("Error", error));
   }
 
   const reader = client.stream({ highWaterMark: 10 }).getReader();

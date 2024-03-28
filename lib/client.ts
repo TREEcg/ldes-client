@@ -409,7 +409,6 @@ export class Client {
     const emitted = longPromise();
     const config: UnderlyingDefaultSource = {
       start: async (controller: Controller) => {
-        this.on("error", controller.error.bind(controller));
         this.modulatorFactory.pause();
         await this.init(
           (member) => {
@@ -430,7 +429,7 @@ export class Client {
       cancel: async () => {
         this.stateFactory.write();
         console.log("Canceled");
-        this.strategy.cancle();
+        this.strategy.cancel();
       },
     };
 

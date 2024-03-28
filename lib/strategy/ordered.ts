@@ -112,6 +112,9 @@ export class OrderedStrategy {
     // - done: extracting is done, indicate this
     // - extract: a member is extracted, add it to our heap
     this.memberNotifer = {
+      error: (error) => {
+        this.notifier.error(error, {});
+      },
       done: (_member, rel) => {
         logger("Member done %s", rel.target);
         const found = this.findOrDefault(rel);
@@ -219,7 +222,7 @@ export class OrderedStrategy {
     }
   }
 
-  cancle() {
+  cancel() {
     this.cancled = true;
   }
 

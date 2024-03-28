@@ -21,9 +21,16 @@ export type ExtractedMember = {
   member: Member;
 };
 
+export type ExtractError = {
+  type: "extract";
+  memberId: Term;
+  error: any;
+};
+export type Error = ExtractError;
 export type MemberEvents = {
   extracted: Member;
   done: Member[];
+  error: Error;
 };
 
 export class Manager {
@@ -66,40 +73,49 @@ export class Manager {
     return this.state.size;
   }
 
-  private async extractMember(
+  private async extractMemberQuads(
     member: Term,
     data: RdfStore,
-  ): Promise<Member | undefined> {
-    let quads: Quad[] = [];
-
+  ): Promise<Quad[]> {
+    const logger = log.extend("extract");
     if (this.shapeMap) {
       if (this.shapeMap.size === 1) {
         // Use the only shape available
-        quads = await this.extractor.extract(
+        return await this.extractor.extract(
           data,
           member,
           Array.from(this.shapeMap.values())[0],
         );
       } else if (this.shapeMap.size > 1) {
         // Find what is the proper shape for this member based on its rdf:type
-        const memberType = getObjects(data, member, RDF.terms.type)[0];
-        if (memberType) {
-          const shapeId = this.shapeMap.get(memberType.value);
+        const types = getObjects(data, member, RDF.terms.type);
+        for (let type of types) {
+          const shapeId = this.shapeMap.get(type.value);
           if (shapeId) {
-            quads = await this.extractor.extract(data, member, shapeId);
+            return await this.extractor.extract(data, member, shapeId);
           }
-        } else {
-          // There is no rdf:type defined for this member. Fallback to CBD extraction
-          quads = await this.extractor.extract(data, member);
         }
-      } else {
-        // Do a simple CBD extraction
-        quads = await this.extractor.extract(data, member);
+
+        logger(
+          "%s (%s) is not part of the configured types %s",
+          member.value,
+          types.map((x) => x.value).join(", "),
+          [...this.shapeMap.keys()].join(", "),
+        );
+
+        return [];
       }
-    } else {
-      // Do a simple CBD extraction
-      quads = await this.extractor.extract(data, member);
     }
+
+    // let the extractor do it's thing
+    return await this.extractor.extract(data, member);
+  }
+
+  private async extractMember(
+    member: Term,
+    data: RdfStore,
+  ): Promise<Member | undefined> {
+    const quads: Quad[] = await this.extractMemberQuads(member, data);
 
     if (this.state.has(member.value)) {
       return;
@@ -133,7 +149,6 @@ export class Manager {
         )?.object.value;
       }
 
-      // HEAD
       return { id: member, quads, timestamp, isVersionOf };
     }
   }
@@ -149,16 +164,23 @@ export class Manager {
 
     logger("%d members", members.length);
 
-    const promises: Promise<Member | undefined>[] = [];
+    const promises: Promise<Member | undefined | void>[] = [];
 
     for (let member of members) {
       if (!this.state.has(member.value)) {
-        const promise = this.extractMember(member, page.data).then((member) => {
-          if (member) {
-            notifier.extracted(member, state);
-          }
-          return member;
-        });
+        const promise = this.extractMember(member, page.data)
+          .then((member) => {
+            if (member) {
+              notifier.extracted(member, state);
+            }
+            return member;
+          })
+          .catch((ex) => {
+            notifier.error(
+              { error: ex, type: "extract", memberId: member },
+              state,
+            );
+          });
 
         promises.push(promise);
       }
