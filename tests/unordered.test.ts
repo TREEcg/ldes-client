@@ -471,13 +471,8 @@ describe("more complex tree", () => {
 
     let thrown = false;
 
-    try {
-      const members = await read(client.stream());
-      console.log("Here", members);
-    } catch (ex) {
-      console.log("Throw", ex);
-      thrown = true;
-    }
+    client.on("error", () => (thrown = true));
+    await read(client.stream());
 
     expect(thrown).toBeTruthy();
   });
